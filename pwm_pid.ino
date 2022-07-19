@@ -6,14 +6,21 @@
 
 #define temp 39
 
-#define setpoint = 298.15
-#define KI = 10;
-#define KP = 10;
-#define KD = 10;
+double setpoint = 298.15;
+double KI = 1;
+double KP = 2;
+double KD = 1;
 
-auto erroanterior = 0;
-auto pwmanterior = 0.5;
-auto deltaerroanterior = 0;
+double tempoatual = 0;
+double tempocorrido = 0;
+double tempoanterior = 0;
+double pwmanterior = 0.5;
+double mediamovel1[5]={0, 0, 0, 0, 0};
+double mediamovel2[5]={0, 0, 0, 0, 0};
+double mediamovelerro1 = 0;
+double mediamovelerro2 = 0;
+double calc1 = 0;
+double calc2 = 0;
 
 void setup() {
   Serial.begin(19200);
@@ -32,13 +39,28 @@ void loop() {
   auto value = analogRead(temp);
   auto temperatura = 0.080586 * value;
   auto erro = setpoint - temperatura;
-  auto deltaerro = erro - erroanterior;
+  tempoatual = millis();
+  tempocorrido = tempoatual - tempoanterior;
+  int i;
+  //cálculo das médias móveis
+  for(i=4; i>0; i--){
+    mediamovel1[i] = mediamovel1[i-1];
+    mediamovel2[i] = mediamovel2[i-1];
+  }
+  mediamovel1[0] = erro;
+  for(i=4; i>-1; i--){
+    calc1 += mediamovel1[i];
+  }
+  auto mediamovelerro1 = calc1/5;
+  mediamovel2[0] = mediamovelerro1;
+  for(i=4; i>-1; i--){
+    calc2 += mediamovel2[i];
+  }
+  auto mediamovelerro2 = calc2/5;  
   //calculo saida PWM com PID
-  auto deltapwm = ((erro / abs(erro)) * KI) + ((deltaerro / erro) * KP) + (((deltaerro * deltaerroanterior) / erro) * KD);
+  auto deltapwm = ((erro / abs(erro)) * KI) + ((mediamovelerro1 / tempocorrido) * KP) + ((mediamovelerro2 / tempocorrido) * KD);
   auto pwmout = ((pwmanterior + deltapwm) * 100);
   pwmanterior = pwmout / 100;
-  erroanterior = erro;
-  deltaerroanterior = deltaerro;
   //atuacao do controlador
   if (pwmout > 50 && pwmout < 100){
     digitalWrite (res_2, HIGH);
